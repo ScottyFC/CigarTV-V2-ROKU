@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ShowCard" extends="Group">
+    <interface>
+        <field id="cardTitle" type="string" onChange="onDataChange" />
+        <field id="cardSubtitle" type="string" onChange="onDataChange" />
+        <field id="cardCategory" type="string" onChange="onDataChange" />
+        <field id="cardTime" type="string" onChange="onDataChange" />
+        <field id="cardProgress" type="float" value="0.0" onChange="onDataChange" />
+        <field id="cardThumbUrl" type="string" onChange="onDataChange" />
+        <field id="isFocused" type="boolean" value="false" onChange="onFocusChange" />
+        <field id="rowListItemFocused" type="boolean" value="false" onChange="onGridFocusChange" />
+        <field id="cardWidth" type="float" value="360.0" />
+        <field id="cardHeight" type="float" value="150.0" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/Theme.brs" />
+    <script type="text/brightscript" uri="pkg:/components/ShowCard.brs" />
+</component>

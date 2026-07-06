@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ApiTask" extends="Task">
+    <interface>
+        <field id="requestUrl" type="string" />
+        <field id="authToken" type="string" value="" />
+        <field id="responseType" type="string" value="json" /> <!-- "json" or "xml" -->
+        <field id="responseData" type="assocarray" alwaysNotify="true" />
+        <field id="responseRaw" type="string" alwaysNotify="true" />
+        <field id="failed" type="boolean" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/ApiTask.brs" />
+</component>
