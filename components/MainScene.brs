@@ -36,6 +36,73 @@ sub Init()
     GoToChooser()
 
     m.top.SetFocus(true)
+
+    ' In-app splash overlay: created LAST so it sits above everything, held 3s, then
+    ' faded out. The scene is already fully built + focused, so it stays interactive
+    ' underneath and any key press dismisses the splash instantly (guaranteed escape).
+    BuildSplashOverlay()
+end sub
+
+sub BuildSplashOverlay()
+    m.splashGroup = m.top.CreateChild("Group")
+
+    ' Opaque backing in the splash's own background color, created BEFORE the poster.
+    ' This makes the overlay fully solid from the very first frame, so the home screen
+    ' can't peek through during the brief window before the JPEG finishes loading.
+    m.splashBack = m.splashGroup.CreateChild("Rectangle")
+    m.splashBack.color = "0xEEEEE6FF"
+    m.splashBack.translation = [0, 0]
+    m.splashBack.width = 1920
+    m.splashBack.height = 1080
+
+    m.splashOverlay = m.splashGroup.CreateChild("Poster")
+    m.splashOverlay.uri = "pkg:/images/splash_full.jpg"
+    m.splashOverlay.translation = [0, 0]
+    m.splashOverlay.width = 1920
+    m.splashOverlay.height = 1080
+    m.splashOverlay.loadDisplayMode = "scaleToFill"
+    m.splashOverlay.opacity = 1.0
+    m.splashOpacity = 1.0
+    m.splashActive = true
+
+    ' Hold timer: fires once after 3s, then the fade timer takes over.
+    m.splashHold = m.splashGroup.CreateChild("Timer")
+    m.splashHold.duration = 3.0
+    m.splashHold.repeat = false
+    m.splashHold.ObserveField("fire", "OnSplashFadeStart")
+
+    m.splashFade = m.splashGroup.CreateChild("Timer")
+    m.splashFade.duration = 0.04
+    m.splashFade.repeat = true
+    m.splashFade.ObserveField("fire", "OnSplashFadeTick")
+
+    m.splashHold.control = "start"
+end sub
+
+sub OnSplashFadeStart()
+    m.splashFade.control = "start"
+end sub
+
+sub OnSplashFadeTick()
+    m.splashOpacity = m.splashOpacity - 0.05
+    if m.splashOpacity <= 0.0
+        m.splashOpacity = 0.0
+        m.splashFade.control = "stop"
+        m.splashGroup.visible = false
+        m.splashActive = false
+    end if
+    m.splashGroup.opacity = m.splashOpacity
+end sub
+
+' Instant dismiss (any key press). Works because the scene is already interactive.
+sub DismissSplash()
+    if m.splashHold <> invalid then m.splashHold.control = "stop"
+    if m.splashFade <> invalid then m.splashFade.control = "stop"
+    if m.splashGroup <> invalid
+        m.splashGroup.opacity = 0.0
+        m.splashGroup.visible = false
+    end if
+    m.splashActive = false
 end sub
 
 ' ============================================================
@@ -316,16 +383,16 @@ sub BuildVodGridScreen()
 
     m.vodBackGlow = m.vodGridGroup.CreateChild("Poster")
     m.vodBackGlow.uri = "pkg:/images/focusframe.png"
-    m.vodBackGlow.translation = [54, 64]
-    m.vodBackGlow.width = 72
-    m.vodBackGlow.height = 72
+    m.vodBackGlow.translation = [48, 56]
+    m.vodBackGlow.width = 88
+    m.vodBackGlow.height = 88
     m.vodBackGlow.visible = false
 
     m.vodBackBtn = m.vodGridGroup.CreateChild("Poster")
     m.vodBackBtn.uri = "pkg:/images/back.png"
-    m.vodBackBtn.translation = [60, 70]
-    m.vodBackBtn.width = 60
-    m.vodBackBtn.height = 60
+    m.vodBackBtn.translation = [56, 64]
+    m.vodBackBtn.width = 72
+    m.vodBackBtn.height = 72
 
     m.vodHeaderLogo = m.vodGridGroup.CreateChild("Poster")
     m.vodHeaderLogo.uri = "pkg:/images/logo.png"
@@ -341,7 +408,7 @@ sub BuildVodGridScreen()
     m.vodHeaderLabel.font = PoppinsFont("bold", 40)
 
     m.showRows = m.vodGridGroup.CreateChild("Group")
-    m.showRows.translation = [60, 200]
+    m.showRows.translation = [90, 200]
     m.vodGridGroup.visible = false
 end sub
 
@@ -374,63 +441,87 @@ end sub
 sub BuildEpisodeGuideScreen()
     m.guideGroup = m.top.CreateChild("Group")
 
+    ' --- Episode list FIRST so everything else draws above it. The list scrolls;
+    ' rows that move up slide underneath the opaque header band below. ---
+    m.guideListClip = m.guideGroup.CreateChild("Group")
+    m.guideListClip.translation = [150, 330]
+
+    m.guideList = m.guideListClip.CreateChild("Group")
+    m.guideList.translation = [0, 0]
+
+    ' --- Pinned header band (opaque) - logo, description, hairline accent ---
+    m.guideHeaderBand = m.guideGroup.CreateChild("Rectangle")
+    m.guideHeaderBand.color = "0x12100EF8"
+    m.guideHeaderBand.translation = [0, 0]
+    m.guideHeaderBand.width = 1920
+    m.guideHeaderBand.height = 322
+
+    m.guideHairline = m.guideGroup.CreateChild("Rectangle")
+    m.guideHairline.color = "0xF3D38966"
+    m.guideHairline.translation = [0, 219]
+    m.guideHairline.width = 1920
+    m.guideHairline.height = 2
+
+    m.guideBackGlow = m.guideGroup.CreateChild("Poster")
+    m.guideBackGlow.uri = "pkg:/images/focusframe.png"
+    m.guideBackGlow.translation = [40, 66]
+    m.guideBackGlow.width = 88
+    m.guideBackGlow.height = 88
+    m.guideBackGlow.visible = false
+
     m.guideBackBtn = m.guideGroup.CreateChild("Poster")
     m.guideBackBtn.uri = "pkg:/images/back.png"
-    m.guideBackBtn.translation = [56, 56]
-    m.guideBackBtn.width = 52
-    m.guideBackBtn.height = 52
+    m.guideBackBtn.translation = [48, 74]
+    m.guideBackBtn.width = 72
+    m.guideBackBtn.height = 72
 
     m.guideLogo = m.guideGroup.CreateChild("Poster")
-    m.guideLogo.translation = [140, 40]
-    m.guideLogo.width = 220
-    m.guideLogo.height = 96
+    m.guideLogo.translation = [160, 20]
+    m.guideLogo.width = 380
+    m.guideLogo.height = 180
     m.guideLogo.loadDisplayMode = "scaleToFit"
 
     m.guideDescription = m.guideGroup.CreateChild("Label")
-    m.guideDescription.translation = [400, 48]
-    m.guideDescription.width = 1440
+    m.guideDescription.translation = [600, 60]
+    m.guideDescription.width = 1240
     m.guideDescription.color = m.humidor.smoke100
-    m.guideDescription.font = PoppinsFont("regular", 18)
+    m.guideDescription.font = PoppinsFont("regular", 20)
     m.guideDescription.wrap = true
     m.guideDescription.maxLines = 3
+    m.guideDescription.lineSpacing = 6
 
-    ' --- Season dropdown (collapsed: pill w/ current season + chevron) ---
-    m.seasonDropX = 140
-    m.seasonDropY = 180
-    m.seasonDropW = 260
-    m.seasonDropH = 52
+    ' --- Season dropdown pill (below the header band) ---
+    m.seasonDropX = 150
+    m.seasonDropY = 246
+    m.seasonDropW = 280
+    m.seasonDropH = 56
 
     m.seasonPill = m.guideGroup.CreateChild("Rectangle")
-    m.seasonPill.color = "0x0D0C0BCC"
+    m.seasonPill.color = "0x1A1712E6"
     m.seasonPill.translation = [m.seasonDropX, m.seasonDropY]
     m.seasonPill.width = m.seasonDropW
     m.seasonPill.height = m.seasonDropH
     m.seasonPillEdges = MakeOutline(m.seasonPill)
+    m.seasonPill.visible = true ' MakeOutline hides the fill; we want the dark fill + outline
+    m.seasonPill.color = "0x1A1712E6"
 
     m.seasonLabel = m.guideGroup.CreateChild("Label")
-    m.seasonLabel.translation = [m.seasonDropX + 24, m.seasonDropY + 10]
+    m.seasonLabel.translation = [m.seasonDropX + 26, m.seasonDropY + 12]
     m.seasonLabel.color = m.humidor.ember
-    m.seasonLabel.font = PoppinsFont("semibold", 24)
+    m.seasonLabel.font = PoppinsFont("semibold", 25)
     m.seasonLabel.text = "Season 1"
 
     m.seasonChevron = m.guideGroup.CreateChild("Label")
-    m.seasonChevron.translation = [m.seasonDropX + m.seasonDropW - 44, m.seasonDropY + 8]
+    m.seasonChevron.translation = [m.seasonDropX + m.seasonDropW - 46, m.seasonDropY + 10]
     m.seasonChevron.color = m.humidor.ember
     m.seasonChevron.font = PoppinsFont("bold", 26)
     m.seasonChevron.text = "v"
 
-    ' --- Season dropdown (expanded menu, hidden until opened) ---
+    ' --- Expanded dropdown menu LAST so it z-orders above the episode list ---
     m.seasonMenu = m.guideGroup.CreateChild("Group")
-    m.seasonMenu.translation = [m.seasonDropX, m.seasonDropY + m.seasonDropH + 6]
+    m.seasonMenu.translation = [m.seasonDropX, m.seasonDropY + m.seasonDropH + 4]
     m.seasonMenu.visible = false
     m.seasonMenuOpen = false
-
-    ' Scrolling episode list in a clipping group
-    m.guideListClip = m.guideGroup.CreateChild("Group")
-    m.guideListClip.translation = [140, 270]
-
-    m.guideList = m.guideListClip.CreateChild("Group")
-    m.guideList.translation = [0, 0]
 
     m.guideGroup.visible = false
 end sub
@@ -440,27 +531,32 @@ sub BuildSeasonMenu()
     m.seasonMenu.RemoveChildrenIndex(m.seasonMenu.GetChildCount(), 0)
     m.seasonMenuRows = []
 
-    itemH = 50
+    itemH = 54
     menuBg = m.seasonMenu.CreateChild("Rectangle")
-    menuBg.color = "0x0D0C0BF2"
+    menuBg.color = "0x14110EFA"
     menuBg.width = m.seasonDropW
     menuBg.height = itemH * m.currentSeasons.Count()
-    MakeOutline(menuBg)
+
+    ' thin gold edge down the left for a modern accent
+    edge = m.seasonMenu.CreateChild("Rectangle")
+    edge.color = m.humidor.ember
+    edge.width = 3
+    edge.height = itemH * m.currentSeasons.Count()
 
     for i = 0 to m.currentSeasons.Count() - 1
         y = i * itemH
 
         hl = m.seasonMenu.CreateChild("Rectangle")
-        hl.color = "0xF3D38940"
+        hl.color = "0xF3D38933"
         hl.translation = [0, y]
         hl.width = m.seasonDropW
         hl.height = itemH
         hl.visible = (i = m.currentSeasonIndex)
 
         lbl = m.seasonMenu.CreateChild("Label")
-        lbl.translation = [24, y + 10]
+        lbl.translation = [26, y + 12]
         lbl.color = m.humidor.paper
-        lbl.font = PoppinsFont("medium", 22)
+        lbl.font = PoppinsFont("medium", 23)
         lbl.text = "Season " + m.currentSeasons[i]
 
         m.seasonMenuRows.Push(hl)
@@ -509,12 +605,17 @@ sub GoToEpisodeGuide(seriesKey as String)
     m.currentSeasonIndex = 0
 
     ' description: use first episode's description as the show-level blurb
-    firstEp = series.episodes[0]
-    m.guideDescription.text = UCase(firstEp.description)
+    ' Series-level description from the catalog (natural case reads cleaner than caps)
+    desc = ""
+    if series.description <> invalid then desc = series.description
+    if desc = "" and series.episodes.Count() > 0 then desc = series.episodes[0].description
+    m.guideDescription.text = desc
 
     LoadSeasonIntoGuide()
     m.focusZone = "guide"
     m.guideFocusIndex = 0
+    m.guideBackFocused = false
+    if m.guideBackGlow <> invalid then m.guideBackGlow.visible = false
 end sub
 
 sub LoadSeasonIntoGuide()
@@ -556,7 +657,14 @@ sub LoadSeasonIntoGuide()
         textX = thumbW + 30
 
         epNum = rowGroup.CreateChild("Label")
-        epNum.text = "EPISODE " + ep.episode
+        meta = "EPISODE " + ep.episode
+        if ep.durationMinutes <> invalid and ep.durationMinutes > 0
+            meta = meta + "  -  " + Str(ep.durationMinutes).Trim() + " MIN"
+        end if
+        if ep.rating <> invalid and ep.rating <> ""
+            meta = meta + "  -  " + ep.rating
+        end if
+        epNum.text = meta
         epNum.translation = [textX, 4]
         epNum.color = m.humidor.smoke300
         epNum.font = PoppinsFont("semibold", 17)
@@ -723,6 +831,21 @@ sub PlayEpisodeAtIndex(index as Integer)
     m.playerGroup.visible = true
     m.epgOverlay.visible = false
 
+    ' Bundled-catalog episodes carry a direct MP4 url; API episodes carry a stream
+    ' slug resolved via the freecast /streams endpoint.
+    if ep.videoUrl <> invalid and ep.videoUrl <> ""
+        videoContent = CreateObject("roSGNode", "ContentNode")
+        videoContent.url = ep.videoUrl
+        videoContent.streamFormat = "mp4"
+        videoContent.live = false
+        videoContent.title = ep.title
+        m.playerVideo.content = videoContent
+        m.playerVideo.control = "play"
+        m.playerVideo.SetFocus(true)
+        m.focusZone = "player"
+        return
+    end if
+
     ' Resolve the stream from the freecast streams endpoint using the episode's
     ' real stream slug (from the catalog), then play in OnFreecastStreamsLoaded.
     m.pendingPlayTitle = ep.title
@@ -784,21 +907,37 @@ end sub
 ' VOD GRID BUILDER - 4-column "Originals" grid
 ' ============================================================
 sub BuildRowFromSeries(seriesMap as Object)
+    ' clear any previous cards (catalog can reload)
+    m.showRows.RemoveChildrenIndex(m.showRows.GetChildCount(), 0)
     m.cards = []
     m.cardSeriesKeys = []
-    m.gridCols = 4
-    cardW = 410
-    cardH = 230
-    gapX = 24
-    gapY = 28
+    m.gridCols = 3
+    cardW = 560
+    cardH = 315
+    gapX = 30
+    gapY = 36
     i = 0
 
-    for each seriesKey in seriesMap
+    ' iterate in configured catalog order when available (assoc arrays don't
+    ' preserve insertion order)
+    keys = m.catalogOrder
+    if keys = invalid or keys.Count() = 0
+        keys = []
+        for each k in seriesMap
+            keys.Push(k)
+        end for
+    end if
+
+    for each seriesKey in keys
         series = seriesMap[seriesKey]
-        if series.episodes.Count() > 0
-            firstEp = series.episodes[0]
+        if series <> invalid and series.episodes.Count() > 0
             row = i \ m.gridCols
             col = i mod m.gridCols
+
+            ' Prefer the branded series key art; fall back to first episode thumb.
+            art = ""
+            if series.thumbnailUrl <> invalid then art = series.thumbnailUrl
+            if art = "" then art = series.episodes[0].thumbUrl
 
             card = m.showRows.CreateChild("ShowCard")
             card.cardWidth = cardW
@@ -807,7 +946,8 @@ sub BuildRowFromSeries(seriesMap as Object)
             card.cardSubtitle = ""
             card.cardCategory = series.category
             card.cardTime = ""
-            card.cardThumbUrl = firstEp.thumbUrl
+            card.cardThumbUrl = art
+            card.artOnly = (series.thumbnailUrl <> invalid and series.thumbnailUrl <> "")
             card.cardProgress = 0.0
             card.translation = [col * (cardW + gapX), row * (cardH + gapY)]
             m.cards.Push(card)
@@ -824,6 +964,12 @@ end sub
 ' ============================================================
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+
+    ' Any key dismisses the splash immediately - guaranteed escape hatch.
+    if m.splashActive = true
+        DismissSplash()
+        return true
+    end if
 
     if key = "back" then return HandleBack()
 
@@ -938,7 +1084,26 @@ end function
 function HandleGuideKey(key as String) as Boolean
     if m.guideRows = invalid or m.guideRows.Count() = 0 then return false
 
-    if key = "down" and m.guideFocusIndex < m.guideRows.Count() - 1
+    ' Back-button focus mode: reached via Left from the list.
+    if m.guideBackFocused
+        if key = "OK"
+            m.guideBackFocused = false
+            m.guideBackGlow.visible = false
+            GoToVodGrid()
+            return true
+        else if key = "right" or key = "down"
+            m.guideBackFocused = false
+            m.guideBackGlow.visible = false
+            return true
+        end if
+        return true
+    end if
+
+    if key = "left"
+        m.guideBackFocused = true
+        m.guideBackGlow.visible = true
+        return true
+    else if key = "down" and m.guideFocusIndex < m.guideRows.Count() - 1
         m.guideRows[m.guideFocusIndex].visible = false
         m.guideFocusIndex = m.guideFocusIndex + 1
         m.guideRows[m.guideFocusIndex].visible = true
@@ -1039,8 +1204,10 @@ sub LoadCatalog()
     m.seasonQueue = []       ' pending {slug, seriesKey, seasonId, seasonNumber} fetches
 
     if not fc.enabled or fc.apiKey = ""
-        ShowCatalogNotice("Add a freecast API key to load the catalog")
-        BuildRowFromSeries({})
+        ' Test mode: load the bundled catalog (data/catalog.json, generated from the
+        ' production episode CSV). Full VOD is testable offline; the freecast path
+        ' takes over automatically once enabled + keyed.
+        LoadBundledCatalog()
         return
     end if
 
@@ -1056,6 +1223,62 @@ sub LoadCatalog()
     m.catalogTask.ObserveField("failed", "OnShowFailed")
 
     FetchNextShow()
+end sub
+
+' Loads the bundled test catalog from pkg:/data/catalog.json (generated from the
+' production episode CSV). Local file read - no network, no threading constraints.
+sub LoadBundledCatalog()
+    raw = ReadAsciiFile("pkg:/data/catalog.json")
+    if raw = invalid or raw = ""
+        ShowCatalogNotice("Bundled catalog missing (data/catalog.json)")
+        BuildRowFromSeries({})
+        return
+    end if
+
+    parsed = ParseJson(raw)
+    if parsed = invalid or parsed.series = invalid
+        ShowCatalogNotice("Bundled catalog failed to parse")
+        BuildRowFromSeries({})
+        return
+    end if
+
+    m.seriesMap = {}
+    m.catalogOrder = []
+
+    for each s in parsed.series
+        key = s.seriesKey
+        entry = {
+            displayName: s.title
+            description: s.description
+            rating: s.rating
+            thumbnailUrl: s.thumbnailUrl
+            category: CategoryForSeries(key)
+            episodes: []
+            seasons: []
+        }
+        for each e in s.episodes
+            entry.episodes.Push({
+                title: e.title
+                description: e.description
+                longDescription: e.longDescription
+                rating: e.rating
+                durationMinutes: e.durationMinutes
+                thumbUrl: e.thumbnailUrl
+                videoUrl: e.videoUrl
+                streamSlug: ""
+                season: e.season
+                episode: e.episode
+            })
+            if Instr(1, "|" + JoinSeasons(entry.seasons) + "|", "|" + e.season + "|") = 0
+                entry.seasons.Push(e.season)
+            end if
+        end for
+        m.seriesMap[key] = entry
+        m.catalogOrder.Push(key)
+    end for
+
+    BuildRowFromSeries(m.seriesMap)
+    HideCatalogNotice()
 end sub
 
 sub FetchNextShow()

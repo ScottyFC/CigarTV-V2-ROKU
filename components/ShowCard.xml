@@ -7,10 +7,11 @@
         <field id="cardTime" type="string" onChange="onDataChange" />
         <field id="cardProgress" type="float" value="0.0" onChange="onDataChange" />
         <field id="cardThumbUrl" type="string" onChange="onDataChange" />
+        <field id="artOnly" type="boolean" value="false" onChange="onDataChange" />
         <field id="isFocused" type="boolean" value="false" onChange="onFocusChange" />
         <field id="rowListItemFocused" type="boolean" value="false" onChange="onGridFocusChange" />
-        <field id="cardWidth" type="float" value="360.0" />
-        <field id="cardHeight" type="float" value="150.0" />
+        <field id="cardWidth" type="float" value="360.0" onChange="onSizeChange" />
+        <field id="cardHeight" type="float" value="150.0" onChange="onSizeChange" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/Theme.brs" />
     <script type="text/brightscript" uri="pkg:/components/ShowCard.brs" />
