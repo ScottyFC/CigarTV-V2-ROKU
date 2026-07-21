@@ -98,6 +98,13 @@ function ApiConfig() as Object
     return {
         liveStreamUrl: "https://amg30862-amg30862c1-amgplt0065.playout.now3.amagi.tv/ts-us-e2-n2/playlist/amg30862-amg30862c1-amgplt0065/playlist.m3u8"
         epgUrl: "https://d31l2nn7dlh4li.cloudfront.net/amg30862/epg_deliveries/amgplt0065/amg30862c1/amg30862c1.xml"
+
+        ' ---- VOD catalog source (MRSS) ----
+        ' Paste the public URL of your hosted feed.xml here. When set, the app fetches
+        ' and parses this MRSS on launch to build the VOD catalog. If empty (or if the
+        ' fetch/parse fails), the app falls back to the bundled data/catalog.json so it
+        ' always has content. HTTPS is strongly recommended (Roku prefers it).
+        feedUrl: ""
     }
 end function
 

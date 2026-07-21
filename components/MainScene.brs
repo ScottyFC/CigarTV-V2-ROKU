@@ -1203,6 +1203,19 @@ sub LoadCatalog()
     m.showQueue = []         ' shows still to fetch
     m.seasonQueue = []       ' pending {slug, seriesKey, seasonId, seasonNumber} fetches
 
+    ' Preferred source: a hosted MRSS feed (see ApiConfig().feedUrl). Fetched async;
+    ' on success it's parsed into m.seriesMap, on any failure we fall back to bundled.
+    cfg = ApiConfig()
+    if cfg.feedUrl <> invalid and cfg.feedUrl <> ""
+        m.feedTask = m.top.CreateChild("ApiTask")
+        m.feedTask.responseType = "xml"
+        m.feedTask.requestUrl = cfg.feedUrl
+        m.feedTask.ObserveField("responseRaw", "OnFeedLoaded")
+        m.feedTask.ObserveField("failed", "OnFeedFailed")
+        m.feedTask.control = "RUN"
+        return
+    end if
+
     if not fc.enabled or fc.apiKey = ""
         ' Test mode: load the bundled catalog (data/catalog.json, generated from the
         ' production episode CSV). Full VOD is testable offline; the freecast path
@@ -1224,6 +1237,146 @@ sub LoadCatalog()
 
     FetchNextShow()
 end sub
+
+' ============================================================
+' MRSS FEED CATALOG (hosted feed.xml)
+' ============================================================
+' Parses the CigarTV MRSS schema into the same m.seriesMap the UI consumes. Groups
+' items by <roku:seriesId>, pulling series-level metadata (name, thumbnail,
+' description) from the first item seen for each series. Any failure falls back to
+' the bundled catalog so the app is never left empty.
+sub OnFeedLoaded()
+    raw = m.feedTask.responseRaw
+    if raw = invalid or raw = ""
+        OnFeedFailed()
+        return
+    end if
+    xml = CreateObject("roXMLElement")
+    if not xml.Parse(raw)
+        OnFeedFailed()
+        return
+    end if
+
+    ' Navigate to <channel> then its <item> children.
+    channel = invalid
+    for each c in xml.GetChildElements()
+        if LCase(c.GetName()) = "channel" then channel = c
+    end for
+    if channel = invalid
+        OnFeedFailed()
+        return
+    end if
+
+    m.seriesMap = {}
+    m.catalogOrder = []
+
+    for each item in channel.GetChildElements()
+        if LCase(item.GetName()) = "item"
+            seriesId = FeedChildText(item, "seriesid")
+            if seriesId = "" then seriesId = FeedChildText(item, "seriesname")
+            if seriesId <> ""
+                if not m.seriesMap.DoesExist(seriesId)
+                    m.seriesMap[seriesId] = {
+                        displayName: FeedChildText(item, "seriesname")
+                        description: FeedChildText(item, "seriesdescription")
+                        rating: FeedChildText(item, "rating")
+                        thumbnailUrl: FeedChildText(item, "seriesthumbnail")
+                        category: CategoryForSeries(seriesId)
+                        episodes: []
+                        seasons: []
+                    }
+                    m.catalogOrder.Push(seriesId)
+                end if
+                entry = m.seriesMap[seriesId]
+
+                ' episode video + thumbnail live on <media:content> / nested <media:thumbnail>
+                videoUrl = ""
+                thumbUrl = ""
+                content = FeedChild(item, "content")
+                if content <> invalid
+                    videoUrl = content.GetAttributes()["url"]
+                    thumb = FeedChild(content, "thumbnail")
+                    if thumb <> invalid then thumbUrl = thumb.GetAttributes()["url"]
+                end if
+
+                season = FeedChildText(item, "season")
+                episode = FeedChildText(item, "episode")
+                if season = "" then season = "1"
+
+                entry.episodes.Push({
+                    title: FeedChildText(item, "title")
+                    description: FeedChildText(item, "description")
+                    longDescription: FeedMediaDescription(item)
+                    rating: FeedChildText(item, "rating")
+                    durationMinutes: FeedDurationMinutes(content)
+                    thumbUrl: thumbUrl
+                    videoUrl: videoUrl
+                    streamSlug: ""
+                    season: season
+                    episode: episode
+                })
+                if Instr(1, "|" + JoinSeasons(entry.seasons) + "|", "|" + season + "|") = 0
+                    entry.seasons.Push(season)
+                end if
+            end if
+        end if
+    end for
+
+    if m.seriesMap.Count() = 0
+        OnFeedFailed()
+        return
+    end if
+
+    BuildRowFromSeries(m.seriesMap)
+    HideCatalogNotice()
+end sub
+
+sub OnFeedFailed()
+    ' Feed unreachable or unparseable - fall back to the bundled catalog.
+    LoadBundledCatalog()
+end sub
+
+' Returns the text of the first child whose name ends with the given suffix
+' (namespace-agnostic: matches "season", "roku:season", etc.).
+function FeedChildText(parent as Object, suffix as String) as String
+    node = FeedChild(parent, suffix)
+    if node = invalid then return ""
+    t = node.GetText()
+    if t = invalid then return ""
+    return t
+end function
+
+function FeedChild(parent as Object, suffix as String) as Object
+    kids = parent.GetChildElements()
+    if kids = invalid then return invalid
+    for each c in kids
+        if InStr(1, LCase(c.GetName()), LCase(suffix)) > 0 then return c
+    end for
+    return invalid
+end function
+
+' media:content duration attribute is in seconds; convert to whole minutes.
+function FeedDurationMinutes(content as Object) as Integer
+    if content = invalid then return 0
+    secs = content.GetAttributes()["duration"]
+    if secs = invalid or secs = "" then return 0
+    n = Val(secs)
+    return Int(n / 60 + 0.5)
+end function
+
+' Prefer the richer <media:description> when present, else the plain <description>.
+function FeedMediaDescription(item as Object) as String
+    kids = item.GetChildElements()
+    if kids = invalid then return ""
+    for each c in kids
+        nm = LCase(c.GetName())
+        if InStr(1, nm, "media") > 0 and InStr(1, nm, "description") > 0
+            t = c.GetText()
+            if t <> invalid then return t
+        end if
+    end for
+    return FeedChildText(item, "description")
+end function
 
 ' Loads the bundled test catalog from pkg:/data/catalog.json (generated from the
 ' production episode CSV). Local file read - no network, no threading constraints.
