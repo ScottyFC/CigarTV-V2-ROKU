@@ -104,7 +104,7 @@ function ApiConfig() as Object
         ' and parses this MRSS on launch to build the VOD catalog. If empty (or if the
         ' fetch/parse fails), the app falls back to the bundled data/catalog.json so it
         ' always has content. HTTPS is strongly recommended (Roku prefers it).
-        feedUrl: ""
+        feedUrl: "https://d3h1d86sioogzh.cloudfront.net/00_CHANNEL_ASSETS/MRSS_FEEDS/RokuV2Feed.xml"
     }
 end function
 

@@ -7,19 +7,22 @@ sub showChannelSGScreen(args as Dynamic)
     port = CreateObject("roMessagePort")
     screen.setMessagePort(port)
 
-    ' Create and show the scene FIRST so the app is guaranteed to render and become
-    ' interactive. Nothing that could fail runs before this point.
+    ' 1. Create roInput and attach it to your main message loop
+    input = CreateObject("roInput")
+    input.setMessagePort(port)
+
+    ' Create the scene
     scene = screen.CreateScene("MainScene")
+    
+    ' 2. COLD LAUNCH: Handle deep linking arguments when the app is first launched.
+    ' Roku's static analyzer looks for this to ensure voice launches from the OS work.
+    if args <> invalid and args.contentId <> invalid
+        scene.inputData = args
+    end if
+
     screen.show()
 
-    ' AppLaunchComplete beacon: the UI is up.
-    appMgr = CreateObject("roAppManager")
-    appMgr.UpdateLastKeyPressTime()
-
-    ' Memory-management hooks (cert requirement). Registered AFTER the scene is shown
-    ' and wrapped defensively: if any device rejects one of these calls, the app has
-    ' already launched, so it can never trap us on the splash. The calls remain present
-    ' in source, which is what the certification analyzer checks for.
+    ' Memory-management hooks 
     di = CreateObject("roDeviceInfo")
     di.SetMessagePort(port)
     try
@@ -28,19 +31,31 @@ sub showChannelSGScreen(args as Dynamic)
         limitPct = di.GetMemoryLimitPercent()
         avail = di.GetChannelAvailableMemory()
     catch e
-        ' Intentionally ignored - launch already succeeded.
+        ' Intentionally ignored
     end try
 
     while true
         msg = wait(0, port)
         msgType = type(msg)
+        
         if msgType = "roSGScreenEvent"
             if msg.isScreenClosed()
                 return
             end if
+            
         else if msgType = "roDeviceInfoEvent"
-            ' Memory-pressure signal. The scene keeps memory modest (one reused Video
-            ' node, on-demand thumbnails), so we simply acknowledge here.
+            ' Memory-pressure signal acknowledged
+            
+        ' 3. WARM LAUNCH: Catch roInput events (Fires when app is already running)
+        else if msgType = "roInputEvent"
+            ' The analyzer explicitly looks for the .IsInput() validation check
+            if msg.IsInput()
+                inputData = msg.GetInfo()
+                print "Received roInputEvent: "; inputData
+                
+                ' Pass the warm launch data to the scene
+                scene.inputData = inputData 
+            end if
         end if
     end while
 end sub

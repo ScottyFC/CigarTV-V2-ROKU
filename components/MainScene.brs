@@ -90,6 +90,9 @@ sub OnSplashFadeTick()
         m.splashFade.control = "stop"
         m.splashGroup.visible = false
         m.splashActive = false
+        
+        ' FIRE BEACON: The natural fade has finished and the UI is fully visible.
+        FireAppLaunchComplete()
     end if
     m.splashGroup.opacity = m.splashOpacity
 end sub
@@ -103,6 +106,9 @@ sub DismissSplash()
         m.splashGroup.visible = false
     end if
     m.splashActive = false
+    
+    ' FIRE BEACON: The user interrupted the splash, so the UI is now fully visible.
+    FireAppLaunchComplete()
 end sub
 
 ' ============================================================
@@ -231,8 +237,8 @@ end sub
 ' Each drifts upward and fades out, then resets to the bottom - a continuous plume
 ' effect driven manually by one timer (Animation-node targeting is unreliable here).
 sub BuildSmoke()
-    m.smokeWisps = []
-    m.smokeClock = 0.0
+    m.smokeWisps = [5, 5, 5]
+    m.smokeClock = 5.0
     baseX = 300
     startY = 620
 
@@ -378,43 +384,90 @@ end sub
 ' ============================================================
 ' VOD GRID ("Originals") - 4-column grid, pill header, back btn
 ' ============================================================
+' ============================================================
+' VOD BROWSE (Netflix-style): a hero banner reflecting the focused series, over a
+' horizontal scrolling row of series cards. Starts at series level.
+' ============================================================
 sub BuildVodGridScreen()
     m.vodGridGroup = m.top.CreateChild("Group")
 
+    ' --- Hero banner (top ~60% of screen) ---
+    m.heroArt = m.vodGridGroup.CreateChild("Poster")
+    m.heroArt.translation = [0, 0]
+    m.heroArt.width = 1920
+    m.heroArt.height = 760
+    m.heroArt.loadDisplayMode = "scaleToFill"
+
+    ' Left-to-right dark gradient scrim so title/description are legible over art.
+    m.heroScrimL = m.vodGridGroup.CreateChild("Poster")
+    m.heroScrimL.uri = "pkg:/images/hero_scrim_left.png"
+    m.heroScrimL.translation = [0, 0]
+    m.heroScrimL.width = 1300
+    m.heroScrimL.height = 760
+    ' Bottom fade so the hero blends into the row area below.
+    m.heroScrimB = m.vodGridGroup.CreateChild("Poster")
+    m.heroScrimB.uri = "pkg:/images/hero_scrim_bottom.png"
+    m.heroScrimB.translation = [0, 460]
+    m.heroScrimB.width = 1920
+    m.heroScrimB.height = 300
+
+    ' Back button (top-left, over hero)
     m.vodBackGlow = m.vodGridGroup.CreateChild("Poster")
     m.vodBackGlow.uri = "pkg:/images/focusframe.png"
-    m.vodBackGlow.translation = [48, 56]
-    m.vodBackGlow.width = 88
-    m.vodBackGlow.height = 88
+    m.vodBackGlow.translation = [48, 44]
+    m.vodBackGlow.width = 76
+    m.vodBackGlow.height = 76
     m.vodBackGlow.visible = false
-
     m.vodBackBtn = m.vodGridGroup.CreateChild("Poster")
     m.vodBackBtn.uri = "pkg:/images/back.png"
-    m.vodBackBtn.translation = [56, 64]
-    m.vodBackBtn.width = 72
-    m.vodBackBtn.height = 72
+    m.vodBackBtn.translation = [54, 50]
+    m.vodBackBtn.width = 64
+    m.vodBackBtn.height = 64
 
-    m.vodHeaderLogo = m.vodGridGroup.CreateChild("Poster")
-    m.vodHeaderLogo.uri = "pkg:/images/logo.png"
-    m.vodHeaderLogo.translation = [160, 60]
-    m.vodHeaderLogo.width = 80
-    m.vodHeaderLogo.height = 66
-    m.vodHeaderLogo.loadDisplayMode = "scaleToFit"
+    ' Hero text block
+    m.heroTitle = m.vodGridGroup.CreateChild("Label")
+    m.heroTitle.translation = [90, 320]
+    m.heroTitle.width = 1000
+    m.heroTitle.color = m.humidor.paper
+    m.heroTitle.font = PoppinsFont("extrabold", 76)
+    m.heroTitle.maxLines = 2
+    m.heroTitle.wrap = true
 
-    m.vodHeaderLabel = m.vodGridGroup.CreateChild("Label")
-    m.vodHeaderLabel.text = "Originals"
-    m.vodHeaderLabel.translation = [256, 76]
-    m.vodHeaderLabel.color = m.humidor.paper
-    m.vodHeaderLabel.font = PoppinsFont("bold", 40)
+    m.heroDesc = m.vodGridGroup.CreateChild("Label")
+    m.heroDesc.translation = [90, 500]
+    m.heroDesc.width = 900
+    m.heroDesc.color = m.humidor.smoke100
+    m.heroDesc.font = PoppinsFont("regular", 24)
+    m.heroDesc.maxLines = 3
+    m.heroDesc.wrap = true
+    m.heroDesc.lineSpacing = 6
 
-    m.showRows = m.vodGridGroup.CreateChild("Group")
-    m.showRows.translation = [90, 200]
+    m.heroMeta = m.vodGridGroup.CreateChild("Label")
+    m.heroMeta.translation = [90, 622]
+    m.heroMeta.width = 900
+    m.heroMeta.color = m.humidor.smoke300
+    m.heroMeta.font = PoppinsFont("medium", 20)
+
+    ' --- Row label + horizontal card strip ---
+    m.rowLabel = m.vodGridGroup.CreateChild("Label")
+    m.rowLabel.text = "ORIGINALS"
+    m.rowLabel.translation = [90, 726]
+    m.rowLabel.color = m.humidor.paper
+    m.rowLabel.font = PoppinsFont("bold", 28)
+
+    ' Clipping group for the horizontal strip; inner group slides left/right.
+    m.stripClip = m.vodGridGroup.CreateChild("Group")
+    m.stripClip.translation = [90, 772]
+    m.showRows = m.stripClip.CreateChild("Group")
+    m.showRows.translation = [0, 0]
+
     m.vodGridGroup.visible = false
 end sub
 
 sub GoToVodGrid()
     m.screen = "vodGrid"
     m.focusZone = "vodGrid"
+    ' Netflix-style browse paints its own hero art, so no tiled background needed.
     m.bgImage.uri = "pkg:/images/backgrounds/vod.jpg"
 
     m.chooserGroup.visible = false
@@ -431,7 +484,35 @@ sub GoToVodGrid()
             c.isFocused = false
         end for
         m.cards[0].isFocused = true
+        m.showRows.translation = [0, 0]
+        UpdateHero()
     end if
+end sub
+
+' Updates the hero banner to reflect the currently focused series.
+sub UpdateHero()
+    if m.cards = invalid or m.cards.Count() = 0 then return
+    key = m.cardSeriesKeys[m.focusIndex]
+    series = m.seriesMap[key]
+    if series = invalid then return
+
+    art = ""
+    if series.thumbnailUrl <> invalid then art = series.thumbnailUrl
+    if art = "" and series.episodes.Count() > 0 then art = series.episodes[0].thumbUrl
+    m.heroArt.uri = art
+
+    m.heroTitle.text = series.displayName
+    m.heroDesc.text = series.description
+
+    epCount = series.episodes.Count()
+    seasonCount = series.seasons.Count()
+    meta = ""
+    if seasonCount > 1
+        meta = seasonCount.ToStr() + " Seasons  -  " + epCount.ToStr() + " Episodes"
+    else
+        meta = epCount.ToStr() + " Episodes"
+    end if
+    m.heroMeta.text = meta
 end sub
 
 ' ============================================================
@@ -654,6 +735,17 @@ sub LoadSeasonIntoGuide()
         thumb.translation = [0, 0]
         thumb.loadDisplayMode = "scaleToFill"
 
+        ' Locked (not-yet-released) episodes: dim the thumbnail + show a lock badge.
+        isLocked = (ep.locked = true)
+        if isLocked
+            thumb.opacity = 0.45
+            lockBadge = rowGroup.CreateChild("Poster")
+            lockBadge.uri = "pkg:/images/lock.png"
+            lockBadge.width = 52
+            lockBadge.height = 52
+            lockBadge.translation = [(thumbW / 2) - 26, (thumbH / 2) - 26]
+        end if
+
         textX = thumbW + 30
 
         epNum = rowGroup.CreateChild("Label")
@@ -664,6 +756,7 @@ sub LoadSeasonIntoGuide()
         if ep.rating <> invalid and ep.rating <> ""
             meta = meta + "  -  " + ep.rating
         end if
+        if isLocked then meta = meta + "  -  COMING SOON"
         epNum.text = meta
         epNum.translation = [textX, 4]
         epNum.color = m.humidor.smoke300
@@ -705,28 +798,31 @@ sub BuildPlayerScreen()
     m.playerVideo.width = 1920
     m.playerVideo.height = 1080
 
-    ' --- EPG overlay (live only): bottom strip, auto-hides after 5s ---
+    ' --- EPG overlay (live only): compact bottom strip, auto-hides after 5s ---
+    ' Uses a gradient (not a solid blanket) and sits low so it never fully covers a
+    ' broadcast ticker at the bottom of the live feed.
     m.epgOverlay = m.playerGroup.CreateChild("Group")
-    m.epgOverlay.translation = [0, 840]
+    m.epgOverlay.translation = [0, 916]
 
-    m.epgOverlayBg = m.epgOverlay.CreateChild("Rectangle")
-    m.epgOverlayBg.color = "0x0D0C0BE6"
+    m.epgOverlayBg = m.epgOverlay.CreateChild("Poster")
+    m.epgOverlayBg.uri = "pkg:/images/hero_scrim_bottom.png"
+    m.epgOverlayBg.translation = [0, -36]
     m.epgOverlayBg.width = 1920
-    m.epgOverlayBg.height = 240
+    m.epgOverlayBg.height = 200
 
     m.epgOverlayAccent = m.epgOverlay.CreateChild("Rectangle")
     m.epgOverlayAccent.color = m.humidor.ember
     m.epgOverlayAccent.width = 1920
-    m.epgOverlayAccent.height = 4
+    m.epgOverlayAccent.height = 3
 
     m.epgOverlayHeader = m.epgOverlay.CreateChild("Label")
     m.epgOverlayHeader.text = "UP NEXT ON CIGARTV LIVE"
-    m.epgOverlayHeader.translation = [60, 24]
+    m.epgOverlayHeader.translation = [60, 14]
     m.epgOverlayHeader.color = m.humidor.ember
-    m.epgOverlayHeader.font = PoppinsFont("bold", 28)
+    m.epgOverlayHeader.font = PoppinsFont("bold", 22)
 
     m.epgOverlayRow = m.epgOverlay.CreateChild("Group")
-    m.epgOverlayRow.translation = [60, 80]
+    m.epgOverlayRow.translation = [60, 46]
 
     m.epgOverlay.visible = false
 
@@ -818,12 +914,44 @@ function IIfNow(isNow as Boolean) as String
     return ""
 end function
 
+' Brief centered notice when a locked episode is selected; auto-hides.
+sub ShowLockNotice()
+    if m.lockNotice = invalid
+        m.lockNotice = m.guideGroup.CreateChild("Label")
+        m.lockNotice.translation = [560, 620]
+        m.lockNotice.width = 800
+        m.lockNotice.horizAlign = "center"
+        m.lockNotice.color = m.humidor.ember
+        m.lockNotice.font = PoppinsFont("bold", 30)
+        m.lockNotice.text = "COMING SOON - not yet released"
+        m.lockNoticeTimer = m.guideGroup.CreateChild("Timer")
+        m.lockNoticeTimer.duration = 2.2
+        m.lockNoticeTimer.repeat = false
+        m.lockNoticeTimer.ObserveField("fire", "OnLockNoticeHide")
+    end if
+    m.lockNotice.visible = true
+    m.lockNoticeTimer.control = "stop"
+    m.lockNoticeTimer.control = "start"
+end sub
+
+sub OnLockNoticeHide()
+    if m.lockNotice <> invalid then m.lockNotice.visible = false
+end sub
+
 sub PlayEpisodeAtIndex(index as Integer)
     if m.currentEpisodes = invalid or index < 0 or index >= m.currentEpisodes.Count() then return
+    ep = m.currentEpisodes[index]
+
+    ' Locked (not-yet-released) episodes can't be played - flash a brief notice and
+    ' stay on the guide.
+    if ep.locked = true
+        ShowLockNotice()
+        return
+    end if
+
     m.screen = "player"
     m.playerMode = "vod"
     m.playerEpisodeIndex = index
-    ep = m.currentEpisodes[index]
 
     m.chooserGroup.visible = false
     m.vodGridGroup.visible = false
@@ -911,11 +1039,9 @@ sub BuildRowFromSeries(seriesMap as Object)
     m.showRows.RemoveChildrenIndex(m.showRows.GetChildCount(), 0)
     m.cards = []
     m.cardSeriesKeys = []
-    m.gridCols = 3
-    cardW = 560
-    cardH = 315
-    gapX = 30
-    gapY = 36
+    m.cardW = 384
+    m.cardH = 216
+    m.cardGap = 26
     i = 0
 
     ' iterate in configured catalog order when available (assoc arrays don't
@@ -931,25 +1057,24 @@ sub BuildRowFromSeries(seriesMap as Object)
     for each seriesKey in keys
         series = seriesMap[seriesKey]
         if series <> invalid and series.episodes.Count() > 0
-            row = i \ m.gridCols
-            col = i mod m.gridCols
-
             ' Prefer the branded series key art; fall back to first episode thumb.
             art = ""
             if series.thumbnailUrl <> invalid then art = series.thumbnailUrl
             if art = "" then art = series.episodes[0].thumbUrl
 
             card = m.showRows.CreateChild("ShowCard")
-            card.cardWidth = cardW
-            card.cardHeight = cardH
+            card.cardWidth = m.cardW
+            card.cardHeight = m.cardH
             card.cardTitle = series.displayName
             card.cardSubtitle = ""
             card.cardCategory = series.category
             card.cardTime = ""
             card.cardThumbUrl = art
-            card.artOnly = (series.thumbnailUrl <> invalid and series.thumbnailUrl <> "")
+            ' Strip cards are always art-only: the branded key art already carries the
+            ' show name, so no text/category overlay (removes the stray "EPISODE" label).
+            card.artOnly = true
             card.cardProgress = 0.0
-            card.translation = [col * (cardW + gapX), row * (cardH + gapY)]
+            card.translation = [i * (m.cardW + m.cardGap), 0]
             m.cards.Push(card)
             m.cardSeriesKeys.Push(seriesKey)
             i = i + 1
@@ -957,6 +1082,11 @@ sub BuildRowFromSeries(seriesMap as Object)
     end for
 
     m.focusIndex = 0
+    if m.cards.Count() > 0
+        m.cards[0].isFocused = true
+        m.showRows.translation = [0, 0]
+        UpdateHero()
+    end if
 end sub
 
 ' ============================================================
@@ -1028,7 +1158,7 @@ end function
 function HandleVodGridKey(key as String) as Boolean
     if m.cards = invalid or m.cards.Count() = 0 then return false
 
-    ' Back-button focus mode: reached by pressing Up from the top row.
+    ' Back-button focus mode: reached by pressing Up from the row.
     if m.vodBackFocused
         if key = "OK"
             m.vodBackFocused = false
@@ -1044,28 +1174,19 @@ function HandleVodGridKey(key as String) as Boolean
         return true ' swallow left/right while on the back button
     end if
 
-    cols = m.gridCols
     count = m.cards.Count()
-    row = m.focusIndex \ cols
-    col = m.focusIndex mod cols
     newIndex = m.focusIndex
 
-    if key = "right" and col < cols - 1 and m.focusIndex + 1 < count
+    if key = "right" and m.focusIndex + 1 < count
         newIndex = m.focusIndex + 1
-    else if key = "left" and col > 0
+    else if key = "left" and m.focusIndex > 0
         newIndex = m.focusIndex - 1
-    else if key = "down" and m.focusIndex + cols < count
-        newIndex = m.focusIndex + cols
     else if key = "up"
-        if row > 0
-            newIndex = m.focusIndex - cols
-        else
-            ' top row + Up -> focus the on-screen back button
-            m.cards[m.focusIndex].isFocused = false
-            m.vodBackFocused = true
-            m.vodBackGlow.visible = true
-            return true
-        end if
+        ' Up from the row -> focus the on-screen back button.
+        m.cards[m.focusIndex].isFocused = false
+        m.vodBackFocused = true
+        m.vodBackGlow.visible = true
+        return true
     else if key = "OK"
         GoToEpisodeGuide(m.cardSeriesKeys[m.focusIndex])
         return true
@@ -1077,9 +1198,21 @@ function HandleVodGridKey(key as String) as Boolean
         m.cards[m.focusIndex].isFocused = false
         m.focusIndex = newIndex
         m.cards[m.focusIndex].isFocused = true
+        ScrollStrip()
+        UpdateHero()
     end if
     return true
 end function
+
+' Slides the horizontal strip so the focused card stays comfortably in view. Keeps
+' a couple of cards of lead-in on the left once you scroll past the start.
+sub ScrollStrip()
+    lead = 1
+    idx = m.focusIndex - lead
+    if idx < 0 then idx = 0
+    offset = -(idx * (m.cardW + m.cardGap))
+    m.showRows.translation = [offset, 0]
+end sub
 
 function HandleGuideKey(key as String) as Boolean
     if m.guideRows = invalid or m.guideRows.Count() = 0 then return false
@@ -1269,6 +1402,7 @@ sub OnFeedLoaded()
 
     m.seriesMap = {}
     m.catalogOrder = []
+    m.nowEpoch = CreateObject("roDateTime").AsSeconds()
 
     for each item in channel.GetChildElements()
         if LCase(item.GetName()) = "item"
@@ -1303,6 +1437,16 @@ sub OnFeedLoaded()
                 episode = FeedChildText(item, "episode")
                 if season = "" then season = "1"
 
+                ' Release-date lock: episodes whose release date is in the future are
+                ' locked (playback blocked, lock icon shown). Fails OPEN - if no date
+                ' is found or it can't be parsed, the episode stays unlocked.
+                releaseText = FeedReleaseDateText(item)
+                releaseEpoch = ParseFeedDate(releaseText)
+                locked = false
+                if releaseEpoch <> invalid and releaseEpoch > m.nowEpoch
+                    locked = true
+                end if
+
                 entry.episodes.Push({
                     title: FeedChildText(item, "title")
                     description: FeedChildText(item, "description")
@@ -1314,6 +1458,7 @@ sub OnFeedLoaded()
                     streamSlug: ""
                     season: season
                     episode: episode
+                    locked: locked
                 })
                 if Instr(1, "|" + JoinSeasons(entry.seasons) + "|", "|" + season + "|") = 0
                     entry.seasons.Push(season)
@@ -1362,6 +1507,119 @@ function FeedDurationMinutes(content as Object) as Integer
     if secs = invalid or secs = "" then return 0
     n = Val(secs)
     return Int(n / 60 + 0.5)
+end function
+
+' Looks for a release/air date on the item across the likely element names, in
+' priority order. Returns the raw text (parsed by ParseFeedDate) or "".
+function FeedReleaseDateText(item as Object) as String
+    ' explicit release-date style fields first
+    for each suffix in ["releasedate", "release_date", "airdate", "air_date", "dcdate", "date"]
+        n = FeedChild(item, suffix)
+        if n <> invalid
+            t = n.GetText()
+            if t <> invalid and t <> "" then return t
+        end if
+    end for
+    ' fall back to the standard RSS pubDate
+    n = FeedChild(item, "pubdate")
+    if n <> invalid
+        t = n.GetText()
+        if t <> invalid then return t
+    end if
+    return ""
+end function
+
+' Flexible date parser -> epoch seconds, or invalid if unparseable. Handles the
+' common feed formats: ISO 8601 (YYYY-MM-DD[...]), RFC 822 pubDate
+' (e.g. "Wed, 02 Mar 2026 00:00:00 GMT"), and US MM/DD/YYYY. Anything else returns
+' invalid so the caller fails open (episode stays unlocked).
+function ParseFeedDate(text as String) as Dynamic
+    if text = invalid or text = "" then return invalid
+    t = text.Trim()
+    dt = CreateObject("roDateTime")
+
+    ' ISO 8601 first
+    if InStr(1, t, "-") > 0 and (InStr(1, t, "T") > 0 or Len(t) = 10)
+        iso = t
+        if Len(t) = 10 then iso = t + "T00:00:00Z"
+        dt.FromISO8601String(iso)
+        s = dt.AsSeconds()
+        if s > 0 then return s
+    end if
+
+    ' RFC 822: "Wed, 02 Mar 2026 00:00:00 GMT"  ->  build ISO and parse
+    if InStr(1, t, ",") > 0 or InStr(1, t, " ") > 0
+        parts = SplitBySpace(t)
+        ' Expected token layout with weekday: [Wdy,] DD Mon YYYY [HH:MM:SS] ...
+        idx = 0
+        if parts.Count() >= 4
+            ' detect if first token is a weekday (ends with comma)
+            startI = 0
+            if InStr(1, parts[0], ",") > 0 then startI = 1
+            if parts.Count() > startI + 2
+                dd = parts[startI]
+                mon = MonthNumber(parts[startI + 1])
+                yyyy = parts[startI + 2]
+                if mon <> "" and Len(yyyy) = 4
+                    iso = yyyy + "-" + mon + "-" + Right("0" + dd, 2) + "T00:00:00Z"
+                    dt.FromISO8601String(iso)
+                    s = dt.AsSeconds()
+                    if s > 0 then return s
+                end if
+            end if
+        end if
+    end if
+
+    ' US MM/DD/YYYY
+    if InStr(1, t, "/") > 0
+        seg = []
+        cur = ""
+        for i = 1 to Len(t)
+            ch = Mid(t, i, 1)
+            if ch = "/"
+                seg.Push(cur) : cur = ""
+            else
+                cur = cur + ch
+            end if
+        end for
+        seg.Push(cur)
+        if seg.Count() >= 3
+            mm = Right("0" + seg[0].Trim(), 2)
+            dd = Right("0" + seg[1].Trim(), 2)
+            yyyy = seg[2].Trim()
+            if Len(yyyy) = 4
+                iso = yyyy + "-" + mm + "-" + dd + "T00:00:00Z"
+                dt.FromISO8601String(iso)
+                s = dt.AsSeconds()
+                if s > 0 then return s
+            end if
+        end if
+    end if
+
+    return invalid
+end function
+
+function SplitBySpace(s as String) as Object
+    out = []
+    cur = ""
+    for i = 1 to Len(s)
+        ch = Mid(s, i, 1)
+        if ch = " "
+            if cur <> "" then out.Push(cur)
+            cur = ""
+        else
+            cur = cur + ch
+        end if
+    end for
+    if cur <> "" then out.Push(cur)
+    return out
+end function
+
+function MonthNumber(mon as String) as String
+    m3 = LCase(Left(mon, 3))
+    map = { jan:"01", feb:"02", mar:"03", apr:"04", may:"05", jun:"06", jul:"07", aug:"08", sep:"09", oct:"10", nov:"11", dec:"12" }
+    if map.DoesExist(m3) then return map[m3]
+    return ""
 end function
 
 ' Prefer the richer <media:description> when present, else the plain <description>.
@@ -1421,6 +1679,7 @@ sub LoadBundledCatalog()
                 streamSlug: ""
                 season: e.season
                 episode: e.episode
+                locked: false
             })
             if Instr(1, "|" + JoinSeasons(entry.seasons) + "|", "|" + e.season + "|") = 0
                 entry.seasons.Push(e.season)
@@ -1718,4 +1977,11 @@ function GetChildTextBySuffix(parent as Object, suffix as String) as String
     end for
     return ""
 end function
+
+sub FireAppLaunchComplete()
+    if m.appLaunchBeaconFired = invalid or m.appLaunchBeaconFired = false
+        m.top.signalBeacon("AppLaunchComplete")
+        m.appLaunchBeaconFired = true
+    end if
+end sub
 
