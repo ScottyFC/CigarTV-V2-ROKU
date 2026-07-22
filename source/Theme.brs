@@ -52,6 +52,14 @@ function PoppinsFont(weight as String, size as Integer) as Object
     return f
 end function
 
+' Modesto display font - used for show/series titles (hero + episode-guide header).
+function ModestoFont(size as Integer) as Object
+    f = CreateObject("roSGNode", "Font")
+    f.uri = "pkg:/fonts/Modesto-Regular.otf"
+    f.size = size
+    return f
+end function
+
 ' Maps a series key to its background image and show logo. Backgrounds fall back to
 ' fallback.png when no specific one is assigned; show logos return "" when none exists.
 function SeriesAssets(seriesKey as String) as Object
@@ -99,12 +107,18 @@ function ApiConfig() as Object
         liveStreamUrl: "https://amg30862-amg30862c1-amgplt0065.playout.now3.amagi.tv/ts-us-e2-n2/playlist/amg30862-amg30862c1-amgplt0065/playlist.m3u8"
         epgUrl: "https://d31l2nn7dlh4li.cloudfront.net/amg30862/epg_deliveries/amgplt0065/amg30862c1/amg30862c1.xml"
 
-        ' ---- VOD catalog source (MRSS) ----
-        ' Paste the public URL of your hosted feed.xml here. When set, the app fetches
-        ' and parses this MRSS on launch to build the VOD catalog. If empty (or if the
-        ' fetch/parse fails), the app falls back to the bundled data/catalog.json so it
-        ' always has content. HTTPS is strongly recommended (Roku prefers it).
+        ' ---- VOD catalog source ----
+        ' Priority order: catalogJsonUrl (hosted JSON, same schema as data/catalog.json)
+        ' -> feedUrl (hosted MRSS) -> bundled data/catalog.json. Both hosted paths read
+        ' releaseDate for locking and series thumbnailUrl for the VOD art. Use HTTPS.
+        catalogJsonUrl: "https://d3h1d86sioogzh.cloudfront.net/00_CHANNEL_ASSETS/MRSS_FEEDS/catalog.json"
         feedUrl: "https://d3h1d86sioogzh.cloudfront.net/00_CHANNEL_ASSETS/MRSS_FEEDS/RokuV2Feed.xml"
+
+        ' ---- Device activation (registration screen) ----
+        ' Registration/activation removed for now; config retained (empty) for when it
+        ' is revisited so nothing else needs to change.
+        activationUrl: ""
+        registrationVideoUrl: ""
     }
 end function
 

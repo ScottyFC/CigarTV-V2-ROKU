@@ -7,9 +7,16 @@ sub Init()
     m.scrim = m.top.CreateChild("Poster")
     m.scrim.uri = "pkg:/images/scrim.png"
 
-    m.glow = m.top.CreateChild("Poster")
-    m.glow.uri = "pkg:/images/focusframe.png"
-    m.glow.visible = false
+    ' Sharp square focus border (no rounded corners): four thin ember edges toggled
+    ' together. Replaces the old rounded focusframe.png.
+    m.borderT = m.top.CreateChild("Rectangle")
+    m.borderB = m.top.CreateChild("Rectangle")
+    m.borderL = m.top.CreateChild("Rectangle")
+    m.borderR = m.top.CreateChild("Rectangle")
+    for each b in [m.borderT, m.borderB, m.borderL, m.borderR]
+        b.color = h.ember
+        b.visible = false
+    end for
 
     m.titleLabel = m.top.CreateChild("Label")
     m.titleLabel.color = h.paper
@@ -50,9 +57,19 @@ sub Layout()
     m.scrim.width = w
     m.scrim.height = scrimH
 
-    m.glow.translation = [-6, -6]
-    m.glow.width = w + 12
-    m.glow.height = height + 12
+    bw = 4
+    m.borderT.translation = [0, 0]
+    m.borderT.width = w
+    m.borderT.height = bw
+    m.borderB.translation = [0, height - bw]
+    m.borderB.width = w
+    m.borderB.height = bw
+    m.borderL.translation = [0, 0]
+    m.borderL.width = bw
+    m.borderL.height = height
+    m.borderR.translation = [w - bw, 0]
+    m.borderR.width = bw
+    m.borderR.height = height
 
     m.titleLabel.translation = [pad, height - 78]
     m.titleLabel.width = w - (pad * 2)
@@ -92,12 +109,15 @@ sub onDataChange()
 end sub
 
 sub onFocusChange()
-    if m.glow = invalid then return
-    if m.top.isFocused
-        m.glow.visible = true
+    if m.borderT = invalid then return
+    vis = m.top.isFocused
+    m.borderT.visible = vis
+    m.borderB.visible = vis
+    m.borderL.visible = vis
+    m.borderR.visible = vis
+    if vis
         m.scaleTarget = 1.05
     else
-        m.glow.visible = false
         m.scaleTarget = 1.0
     end if
     m.scaleTimer.control = "start"

@@ -1,4 +1,52 @@
 sub Init()
+    try
+        InitReal()
+    catch e
+        ShowFatalError(e)
+    end try
+end sub
+
+' Renders a runtime Init error full-screen so failures are visible WITHOUT a device
+' console. Removed once the startup issue is resolved.
+sub ShowFatalError(e as Object)
+    bg = m.top.CreateChild("Rectangle")
+    bg.color = "0x140F0AFF"
+    bg.width = 1920
+    bg.height = 1080
+
+    title = m.top.CreateChild("Label")
+    title.translation = [120, 120]
+    title.width = 1680
+    title.color = "0xF3D389FF"
+    title.text = "Startup error (diagnostic build)"
+
+    body = m.top.CreateChild("Label")
+    body.translation = [120, 220]
+    body.width = 1680
+    body.height = 760
+    body.wrap = true
+    body.color = "0xFFFFFFFF"
+    msg = "message: "
+    if e <> invalid and e.message <> invalid then msg = msg + e.message
+    if e <> invalid and e.number <> invalid then msg = msg + Chr(10) + "number: " + Str(e.number)
+    bt = ""
+    if e <> invalid and e.backtrace <> invalid
+        for each fr in e.backtrace
+            fn = ""
+            ln = ""
+            if fr.function <> invalid then fn = fr.function
+            if fr.line_number <> invalid then ln = Str(fr.line_number)
+            bt = bt + Chr(10) + "  " + fn + " : line " + ln
+        end for
+    end if
+    body.text = msg + Chr(10) + Chr(10) + "backtrace:" + bt
+
+    m.top.SetFocus(true)
+end sub
+
+sub InitReal()
+    Rnd(0)
+    m.splashActive = false
     m.theme = Theme()
     m.humidor = HumidorTheme()
     m.cfg = ApiConfig()
@@ -33,14 +81,13 @@ sub Init()
     m.seriesMap = {}
     LoadCatalog()
     LoadEpg()
+
+    ' Launch straight into the home chooser. The splash overlay sits on top, holds 3s,
+    ' then fades. (Registration screen removed for now - to be revisited later.)
     GoToChooser()
+    BuildSplashOverlay()
 
     m.top.SetFocus(true)
-
-    ' In-app splash overlay: created LAST so it sits above everything, held 3s, then
-    ' faded out. The scene is already fully built + focused, so it stays interactive
-    ' underneath and any key press dismisses the splash instantly (guaranteed escape).
-    BuildSplashOverlay()
 end sub
 
 sub BuildSplashOverlay()
@@ -115,6 +162,13 @@ end sub
 ' CHOOSER / HOME SCREEN
 ' Logo left (slow pulse), two stacked panels right: Live (with
 ' now/next) on top, Browse Our Shows below.
+' ============================================================
+' ============================================================
+' REGISTRATION / ACTIVATION SCREEN
+' Shown on first launch until the device is linked. Code-based on-device activation:
+' the viewer enters the shown code at a URL on their phone; the app polls a backend
+' until it reports the device linked, then persists that and proceeds to the app.
+' Keyboard-free (Roku cert-friendly) and dismissible for a "skip for now" path.
 ' ============================================================
 sub BuildChooserScreen()
     m.chooserGroup = m.top.CreateChild("Group")
@@ -237,7 +291,7 @@ end sub
 ' Each drifts upward and fades out, then resets to the bottom - a continuous plume
 ' effect driven manually by one timer (Animation-node targeting is unreliable here).
 sub BuildSmoke()
-    m.smokeWisps = [5, 5, 5]
+    m.smokeWisps = []
     m.smokeClock = 5.0
     baseX = 300
     startY = 620
@@ -377,6 +431,7 @@ sub GoToChooser()
     m.guideGroup.visible = false
     m.playerGroup.visible = false
     m.playerVideo.control = "stop"
+    m.top.SetFocus(true)
     UpdateChooserHighlight()
     UpdateChooserEpgText()
 end sub
@@ -391,25 +446,26 @@ end sub
 sub BuildVodGridScreen()
     m.vodGridGroup = m.top.CreateChild("Group")
 
-    ' --- Hero banner (top ~60% of screen) ---
+    ' --- Hero banner: full-frame art so scaleToFill crops to a natural 16:9 rather
+    ' than squishing into a short band. Gradients keep the lower/left legible. ---
     m.heroArt = m.vodGridGroup.CreateChild("Poster")
     m.heroArt.translation = [0, 0]
     m.heroArt.width = 1920
-    m.heroArt.height = 760
+    m.heroArt.height = 1080
     m.heroArt.loadDisplayMode = "scaleToFill"
 
     ' Left-to-right dark gradient scrim so title/description are legible over art.
     m.heroScrimL = m.vodGridGroup.CreateChild("Poster")
     m.heroScrimL.uri = "pkg:/images/hero_scrim_left.png"
     m.heroScrimL.translation = [0, 0]
-    m.heroScrimL.width = 1300
+    m.heroScrimL.width = 1400
     m.heroScrimL.height = 760
     ' Bottom fade so the hero blends into the row area below.
     m.heroScrimB = m.vodGridGroup.CreateChild("Poster")
     m.heroScrimB.uri = "pkg:/images/hero_scrim_bottom.png"
-    m.heroScrimB.translation = [0, 460]
+    m.heroScrimB.translation = [0, 560]
     m.heroScrimB.width = 1920
-    m.heroScrimB.height = 300
+    m.heroScrimB.height = 400
 
     ' Back button (top-left, over hero)
     m.vodBackGlow = m.vodGridGroup.CreateChild("Poster")
@@ -426,35 +482,31 @@ sub BuildVodGridScreen()
 
     ' Hero text block
     m.heroTitle = m.vodGridGroup.CreateChild("Label")
-    m.heroTitle.translation = [90, 320]
-    m.heroTitle.width = 1000
+    m.heroTitle.translation = [90, 300]
+    m.heroTitle.width = 1050
+    m.heroTitle.height = 180
     m.heroTitle.color = m.humidor.paper
-    m.heroTitle.font = PoppinsFont("extrabold", 76)
+    m.heroTitle.font = ModestoFont(96)
     m.heroTitle.maxLines = 2
     m.heroTitle.wrap = true
+    m.heroTitle.vertAlign = "bottom"
+
+    m.heroMeta = m.vodGridGroup.CreateChild("Label")
+    m.heroMeta.translation = [92, 494]
+    m.heroMeta.width = 900
+    m.heroMeta.color = m.humidor.ember
+    m.heroMeta.font = PoppinsFont("semibold", 20)
 
     m.heroDesc = m.vodGridGroup.CreateChild("Label")
-    m.heroDesc.translation = [90, 500]
-    m.heroDesc.width = 900
+    m.heroDesc.translation = [92, 536]
+    m.heroDesc.width = 820
     m.heroDesc.color = m.humidor.smoke100
-    m.heroDesc.font = PoppinsFont("regular", 24)
-    m.heroDesc.maxLines = 3
+    m.heroDesc.font = PoppinsFont("regular", 22)
+    m.heroDesc.maxLines = 2
     m.heroDesc.wrap = true
     m.heroDesc.lineSpacing = 6
 
-    m.heroMeta = m.vodGridGroup.CreateChild("Label")
-    m.heroMeta.translation = [90, 622]
-    m.heroMeta.width = 900
-    m.heroMeta.color = m.humidor.smoke300
-    m.heroMeta.font = PoppinsFont("medium", 20)
-
-    ' --- Row label + horizontal card strip ---
-    m.rowLabel = m.vodGridGroup.CreateChild("Label")
-    m.rowLabel.text = "ORIGINALS"
-    m.rowLabel.translation = [90, 726]
-    m.rowLabel.color = m.humidor.paper
-    m.rowLabel.font = PoppinsFont("bold", 28)
-
+    ' --- Horizontal card strip (no row label) ---
     ' Clipping group for the horizontal strip; inner group slides left/right.
     m.stripClip = m.vodGridGroup.CreateChild("Group")
     m.stripClip.translation = [90, 772]
@@ -496,9 +548,19 @@ sub UpdateHero()
     series = m.seriesMap[key]
     if series = invalid then return
 
+    ' Hero background = a random EPISODE thumbnail (clean footage, no baked-in title
+    ' text), not the branded series art. Chosen once per series and cached so it
+    ' doesn't reshuffle every time focus returns.
     art = ""
-    if series.thumbnailUrl <> invalid then art = series.thumbnailUrl
-    if art = "" and series.episodes.Count() > 0 then art = series.episodes[0].thumbUrl
+    if series.heroArt <> invalid and series.heroArt <> ""
+        art = series.heroArt
+    else if series.episodes.Count() > 0
+        idx = Int(Rnd(0) * series.episodes.Count())
+        if idx < 0 then idx = 0
+        if idx >= series.episodes.Count() then idx = series.episodes.Count() - 1
+        art = series.episodes[idx].thumbUrl
+        series.heroArt = art
+    end if
     m.heroArt.uri = art
 
     m.heroTitle.text = series.displayName
@@ -506,13 +568,11 @@ sub UpdateHero()
 
     epCount = series.episodes.Count()
     seasonCount = series.seasons.Count()
-    meta = ""
     if seasonCount > 1
-        meta = seasonCount.ToStr() + " Seasons  -  " + epCount.ToStr() + " Episodes"
+        m.heroMeta.text = seasonCount.ToStr() + " Seasons   /   " + epCount.ToStr() + " Episodes"
     else
-        meta = epCount.ToStr() + " Episodes"
+        m.heroMeta.text = epCount.ToStr() + " Episodes"
     end if
-    m.heroMeta.text = meta
 end sub
 
 ' ============================================================
@@ -710,9 +770,9 @@ sub LoadSeasonIntoGuide()
     m.guideList.RemoveChildrenIndex(m.guideList.GetChildCount(), 0)
     m.guideRows = []
 
-    rowH = 168
-    thumbW = 240
-    thumbH = 135
+    rowH = 172
+    thumbW = 256
+    thumbH = 144
 
     for i = 0 to episodes.Count() - 1
         ep = episodes[i]
@@ -721,11 +781,20 @@ sub LoadSeasonIntoGuide()
         rowGroup = m.guideList.CreateChild("Group")
         rowGroup.translation = [0, y]
 
+        ' Subtle highlight panel behind the focused row (Netflix-style). Sits behind the
+        ' thumbnail + text; only the focused row shows it.
+        rowHi = rowGroup.CreateChild("Rectangle")
+        rowHi.color = "0xFFFFFF14"
+        rowHi.width = 1180
+        rowHi.height = thumbH + 24
+        rowHi.translation = [-20, -12]
+        rowHi.visible = (i = 0)
+
         focusBar = rowGroup.CreateChild("Rectangle")
         focusBar.color = m.humidor.ember
-        focusBar.width = 6
+        focusBar.width = 5
         focusBar.height = thumbH
-        focusBar.translation = [-26, 0]
+        focusBar.translation = [-20, 0]
         focusBar.visible = (i = 0)
 
         thumb = rowGroup.CreateChild("Poster")
@@ -738,54 +807,63 @@ sub LoadSeasonIntoGuide()
         ' Locked (not-yet-released) episodes: dim the thumbnail + show a lock badge.
         isLocked = (ep.locked = true)
         if isLocked
-            thumb.opacity = 0.45
+            thumb.opacity = 0.4
             lockBadge = rowGroup.CreateChild("Poster")
             lockBadge.uri = "pkg:/images/lock.png"
-            lockBadge.width = 52
-            lockBadge.height = 52
-            lockBadge.translation = [(thumbW / 2) - 26, (thumbH / 2) - 26]
+            lockBadge.width = 48
+            lockBadge.height = 48
+            lockBadge.translation = [(thumbW / 2) - 24, (thumbH / 2) - 24]
         end if
 
-        textX = thumbW + 30
+        textX = thumbW + 34
 
         epNum = rowGroup.CreateChild("Label")
-        meta = "EPISODE " + ep.episode
+        meta = "E" + ep.episode
         if ep.durationMinutes <> invalid and ep.durationMinutes > 0
-            meta = meta + "  -  " + Str(ep.durationMinutes).Trim() + " MIN"
+            meta = meta + "   " + Str(ep.durationMinutes).Trim() + " min"
         end if
         if ep.rating <> invalid and ep.rating <> ""
-            meta = meta + "  -  " + ep.rating
+            meta = meta + "   " + ep.rating
         end if
-        if isLocked then meta = meta + "  -  COMING SOON"
-        epNum.text = meta
-        epNum.translation = [textX, 4]
+        if isLocked then meta = meta + "   COMING SOON"
+        epNum.text = UCase(meta)
+        epNum.translation = [textX, 10]
         epNum.color = m.humidor.smoke300
-        epNum.font = PoppinsFont("semibold", 17)
+        epNum.font = PoppinsFont("semibold", 15)
 
         epTitle = rowGroup.CreateChild("Label")
         epTitle.text = ep.title
-        epTitle.translation = [textX, 26]
-        epTitle.width = 1360
-        epTitle.color = m.humidor.ember
-        epTitle.font = PoppinsFont("bold", 24)
+        epTitle.translation = [textX, 34]
+        epTitle.width = 760
+        epTitle.color = m.humidor.paper
+        epTitle.font = PoppinsFont("bold", 26)
         epTitle.wrap = false
         epTitle.maxLines = 1
         epTitle.ellipsisText = "..."
 
         epDesc = rowGroup.CreateChild("Label")
         epDesc.text = ep.description
-        epDesc.translation = [textX, 62]
-        epDesc.width = 1360
+        epDesc.translation = [textX, 74]
+        epDesc.width = 760
         epDesc.color = m.humidor.smoke100
         epDesc.font = PoppinsFont("regular", 16)
         epDesc.wrap = true
-        epDesc.maxLines = 3
+        epDesc.maxLines = 2
+        epDesc.lineSpacing = 4
 
-        m.guideRows.Push(focusBar)
+        m.guideRows.Push({ hi: rowHi, bar: focusBar })
     end for
 
     m.guideFocusIndex = 0
     m.guideList.translation = [0, 0]
+end sub
+
+' Shows/hides the highlight panel + focus bar for a guide row by index.
+sub SetGuideRowFocus(index as Integer, focused as Boolean)
+    if m.guideRows = invalid or index < 0 or index >= m.guideRows.Count() then return
+    row = m.guideRows[index]
+    row.hi.visible = focused
+    row.bar.visible = focused
 end sub
 
 ' ============================================================
@@ -1237,16 +1315,16 @@ function HandleGuideKey(key as String) as Boolean
         m.guideBackGlow.visible = true
         return true
     else if key = "down" and m.guideFocusIndex < m.guideRows.Count() - 1
-        m.guideRows[m.guideFocusIndex].visible = false
+        SetGuideRowFocus(m.guideFocusIndex, false)
         m.guideFocusIndex = m.guideFocusIndex + 1
-        m.guideRows[m.guideFocusIndex].visible = true
+        SetGuideRowFocus(m.guideFocusIndex, true)
         ScrollGuideList()
         return true
     else if key = "up"
         if m.guideFocusIndex > 0
-            m.guideRows[m.guideFocusIndex].visible = false
+            SetGuideRowFocus(m.guideFocusIndex, false)
             m.guideFocusIndex = m.guideFocusIndex - 1
-            m.guideRows[m.guideFocusIndex].visible = true
+            SetGuideRowFocus(m.guideFocusIndex, true)
             ScrollGuideList()
         else
             ' at the top of the list; Up opens the season dropdown
@@ -1280,7 +1358,7 @@ function HandleSeasonMenuKey(key as String) as Boolean
         m.currentSeasonIndex = m.seasonMenuIndex
         CloseSeasonMenu()
         LoadSeasonIntoGuide()
-        if m.guideRows.Count() > 0 then m.guideRows[0].visible = true
+        if m.guideRows.Count() > 0 then SetGuideRowFocus(0, true)
         return true
     end if
     return false
@@ -1336,9 +1414,23 @@ sub LoadCatalog()
     m.showQueue = []         ' shows still to fetch
     m.seasonQueue = []       ' pending {slug, seriesKey, seasonId, seasonNumber} fetches
 
-    ' Preferred source: a hosted MRSS feed (see ApiConfig().feedUrl). Fetched async;
-    ' on success it's parsed into m.seriesMap, on any failure we fall back to bundled.
     cfg = ApiConfig()
+
+    ' Preferred source: a hosted JSON catalog (see ApiConfig().catalogJsonUrl). Same
+    ' schema as data/catalog.json. Fetched async; parsed into m.seriesMap; any failure
+    ' falls through to the MRSS feed, then the bundled catalog.
+    if cfg.catalogJsonUrl <> invalid and cfg.catalogJsonUrl <> ""
+        m.jsonTask = m.top.CreateChild("ApiTask")
+        m.jsonTask.responseType = "json"
+        m.jsonTask.requestUrl = cfg.catalogJsonUrl
+        m.jsonTask.ObserveField("responseData", "OnJsonCatalogLoaded")
+        m.jsonTask.ObserveField("failed", "OnJsonCatalogFailed")
+        m.jsonTask.control = "RUN"
+        return
+    end if
+
+    ' Next source: a hosted MRSS feed (see ApiConfig().feedUrl). Fetched async;
+    ' on success it's parsed into m.seriesMap, on any failure we fall back to bundled.
     if cfg.feedUrl <> invalid and cfg.feedUrl <> ""
         m.feedTask = m.top.CreateChild("ApiTask")
         m.feedTask.responseType = "xml"
@@ -1653,8 +1745,43 @@ sub LoadBundledCatalog()
         return
     end if
 
+    BuildCatalogFromJson(parsed)
+    HideCatalogNotice()
+end sub
+
+' Hosted JSON catalog loaded (ApiConfig().catalogJsonUrl).
+sub OnJsonCatalogLoaded()
+    parsed = m.jsonTask.responseData
+    if parsed = invalid or parsed.series = invalid
+        OnJsonCatalogFailed()
+        return
+    end if
+    BuildCatalogFromJson(parsed)
+    HideCatalogNotice()
+end sub
+
+sub OnJsonCatalogFailed()
+    ' JSON unreachable/unparseable -> try the MRSS feed, else bundled.
+    cfg = ApiConfig()
+    if cfg.feedUrl <> invalid and cfg.feedUrl <> ""
+        m.feedTask = m.top.CreateChild("ApiTask")
+        m.feedTask.responseType = "xml"
+        m.feedTask.requestUrl = cfg.feedUrl
+        m.feedTask.ObserveField("responseRaw", "OnFeedLoaded")
+        m.feedTask.ObserveField("failed", "OnFeedFailed")
+        m.feedTask.control = "RUN"
+    else
+        LoadBundledCatalog()
+    end if
+end sub
+
+' Builds m.seriesMap from a parsed catalog.json object (series -> episodes). Shared by
+' the hosted-JSON path and the bundled fallback so series art + release-date locking
+' behave identically. Locks episodes whose releaseDate is in the future.
+sub BuildCatalogFromJson(parsed as Object)
     m.seriesMap = {}
     m.catalogOrder = []
+    m.nowEpoch = CreateObject("roDateTime").AsSeconds()
 
     for each s in parsed.series
         key = s.seriesKey
@@ -1668,6 +1795,10 @@ sub LoadBundledCatalog()
             seasons: []
         }
         for each e in s.episodes
+            releaseEpoch = ParseFeedDate(e.releaseDate)
+            locked = false
+            if releaseEpoch <> invalid and releaseEpoch > m.nowEpoch then locked = true
+
             entry.episodes.Push({
                 title: e.title
                 description: e.description
@@ -1679,7 +1810,7 @@ sub LoadBundledCatalog()
                 streamSlug: ""
                 season: e.season
                 episode: e.episode
-                locked: false
+                locked: locked
             })
             if Instr(1, "|" + JoinSeasons(entry.seasons) + "|", "|" + e.season + "|") = 0
                 entry.seasons.Push(e.season)
@@ -1690,7 +1821,6 @@ sub LoadBundledCatalog()
     end for
 
     BuildRowFromSeries(m.seriesMap)
-    HideCatalogNotice()
 end sub
 
 sub FetchNextShow()

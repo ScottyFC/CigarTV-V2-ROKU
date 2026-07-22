@@ -16,7 +16,7 @@ ui_resolutions=fhd
 bs_const=IS_DEV_BUILD=false
 
 # Poppins font registry
-RequireFonts=Poppins-Regular,Poppins-Medium,Poppins-SemiBold,Poppins-Bold,Poppins-ExtraBold
+RequireFonts=Poppins-Regular,Poppins-Medium,Poppins-SemiBold,Poppins-Bold,Poppins-ExtraBold,Modesto-Regular
 
 requires_audiometadata=0
 supports_input_launch=1
