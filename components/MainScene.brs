@@ -522,6 +522,8 @@ sub GoToVodGrid()
     ' Netflix-style browse paints its own hero art, so no tiled background needed.
     m.bgImage.uri = "pkg:/images/backgrounds/vod.jpg"
 
+    PhCapture(m.top, "vod_grid_opened", invalid)
+
     m.chooserGroup.visible = false
     m.guideGroup.visible = false
     m.playerGroup.visible = false
@@ -725,6 +727,8 @@ sub GoToEpisodeGuide(seriesKey as String)
     m.currentSeriesKey = seriesKey
     series = m.seriesMap[seriesKey]
     if series = invalid then return
+
+    PhCapture(m.top, "show_selected", { show_key: seriesKey, show_name: series.displayName })
 
     assets = SeriesAssets(seriesKey)
     m.bgImage.uri = assets.background
@@ -1023,9 +1027,12 @@ sub PlayEpisodeAtIndex(index as Integer)
     ' Locked (not-yet-released) episodes can't be played - flash a brief notice and
     ' stay on the guide.
     if ep.locked = true
+        PhCapture(m.top, "locked_episode_selected", { show_key: m.currentSeriesKey, episode_title: ep.title, season: ep.season, episode: ep.episode })
         ShowLockNotice()
         return
     end if
+
+    PhCapture(m.top, "episode_started", { show_key: m.currentSeriesKey, episode_title: ep.title, season: ep.season, episode: ep.episode })
 
     m.screen = "player"
     m.playerMode = "vod"
@@ -1081,12 +1088,15 @@ end sub
 sub OnFreecastStreamsFailed()
     ' No playable stream resolved. Return to the guide rather than sit on a black
     ' screen; a real failure here means the streams endpoint/slug/token needs a look.
+    PhCapture(m.top, "episode_playback_failed", { show_key: m.currentSeriesKey, episode_title: m.pendingPlayTitle })
     GoToEpisodeGuide(m.currentSeriesKey)
 end sub
 
 sub PlayLiveStream()
     m.screen = "player"
     m.playerMode = "live"
+
+    PhCapture(m.top, "live_stream_started", invalid)
 
     m.chooserGroup.visible = false
     m.vodGridGroup.visible = false
@@ -1359,6 +1369,7 @@ function HandleSeasonMenuKey(key as String) as Boolean
         CloseSeasonMenu()
         LoadSeasonIntoGuide()
         if m.guideRows.Count() > 0 then SetGuideRowFocus(0, true)
+        PhCapture(m.top, "season_changed", { show_key: m.currentSeriesKey, season: m.currentSeasons[m.currentSeasonIndex] })
         return true
     end if
     return false
@@ -2112,6 +2123,7 @@ sub FireAppLaunchComplete()
     if m.appLaunchBeaconFired = invalid or m.appLaunchBeaconFired = false
         m.top.signalBeacon("AppLaunchComplete")
         m.appLaunchBeaconFired = true
+        PhCapture(m.top, "app_launched", invalid)
     end if
 end sub
 

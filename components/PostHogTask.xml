@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="PostHogTask" extends="Task">
+    <interface>
+        <field id="payload" type="string" value="" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/Theme.brs" />
+    <script type="text/brightscript" uri="pkg:/components/PostHogTask.brs" />
+</component>

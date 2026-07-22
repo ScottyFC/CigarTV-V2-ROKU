@@ -119,6 +119,11 @@ function ApiConfig() as Object
         ' is revisited so nothing else needs to change.
         activationUrl: ""
         registrationVideoUrl: ""
+
+        ' ---- PostHog analytics ----
+        ' Public token - safe to ship in the binary. Update host if using a self-hosted instance.
+        posthogToken: "phc_rF9zJquXG3T6HUkMaQkSe6yfUvZvXPeAQZmcWt2ZKWPk"
+        posthogHost: "https://us.i.posthog.com"
     }
 end function
 

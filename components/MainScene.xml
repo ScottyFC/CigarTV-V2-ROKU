@@ -6,5 +6,6 @@
     <script type="text/brightscript" uri="pkg:/source/Theme.brs" />
     <script type="text/brightscript" uri="pkg:/source/AdMacros.brs" />
     <script type="text/brightscript" uri="pkg:/source/Freecast.brs" />
+    <script type="text/brightscript" uri="pkg:/source/PostHog.brs" />
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 </component>
